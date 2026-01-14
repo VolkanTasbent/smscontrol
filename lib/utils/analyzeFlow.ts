@@ -1,10 +1,10 @@
-// lib/utils/analyzeFlow.ts - GÜNCELLENMİŞ
+// lib/utils/analyzeFlow.ts - GÜNCELLENMİŞ VE DÜZELTİLMİŞ
 import { AnalysisResult } from '../../types';
 import { analyzeSMS } from './analyze';
 import { 
   checkMultipleUrls, 
   extractDomainFromUrl, 
-  checkSuspiciousDomain,  // YENİ FONKSİYON
+  checkSuspiciousDomain,
   checkSafeBrowsing 
 } from './safeBrowsing';
 
@@ -17,12 +17,12 @@ export async function analyzeFlow(
   const base = analyzeSMS(smsText);
   console.log(`📊 Temel analiz: ${base.riskLevel} risk, ${base.score} puan`);
   
-  // 2. URL'LERİ ÇIKAR (safeBrowsing'den DEĞİL, analyze'den)
+  // 2. URL'LERİ ÇIKAR
   const { extractUrls } = await import('./analyze');
   const urls = extractUrls(smsText);
   
   if (urls.length === 0) {
-    console.log('✅ URL bulunamadı');
+    console.log('✅ URL bulunamadı - Temel analiz sonucunu döndür');
     return base;
   }
   
@@ -35,11 +35,11 @@ export async function analyzeFlow(
   
   try {
     // ÇOKLU URL KONTROLÜ (TEK API ÇAĞRISI)
-    console.log(`🔄 ${urls.length} URL Safe Browsing'e gönderiliyor (TEK SEFERDE)...`);
+    console.log(`🔄 ${urls.length} URL Safe Browsing\'e gönderiliyor (TEK SEFERDE)...`);
     
     const batchResults = await checkMultipleUrls(urls);
     
-    // 4. DOMAIN ANALİZİ (YENİ FONKSİYONU KULLAN)
+    // 4. DOMAIN ANALİZİ
     console.log(`🔍 ${urls.length} domain analiz ediliyor...`);
     
     urls.forEach(url => {
@@ -57,7 +57,7 @@ export async function analyzeFlow(
         threatDetails.push(`${threatDesc} tespit edildi: ${url}`);
       }
       
-      // Domain analizi tehdidi (YENİ checkSuspiciousDomain)
+      // Domain analizi tehdidi
       if (domain) {
         const isSuspicious = checkSuspiciousDomain(domain);
         console.log(`      Şüpheli mi? ${isSuspicious}`);
@@ -104,57 +104,86 @@ export async function analyzeFlow(
     }
   }
   
-  // 5. TEHDİT VARSA RİSK SEVİYESİNİ ARTIR
-  const totalThreats = safeBrowsingThreats + domainThreats;
+  // 5. RİSK SKORU VE SEVİYESİ HESAPLA
   
-  // Risk puanını hesapla
+  // Başlangıç skoru temel analizden
   let riskScore = base.score;
   
-  // Safe Browsing tehditleri: yüksek risk
+  // Tehditlerden puan ekle:
+  // Safe Browsing tehditleri: yüksek risk (+40 puan)
   riskScore += safeBrowsingThreats * 40;
   
-  // Domain tehditleri: orta risk
+  // Domain tehditleri: orta risk (+20 puan)
   riskScore += domainThreats * 20;
   
   // Maksimum 100, minimum 0
   riskScore = Math.max(0, Math.min(100, riskScore));
   
   console.log(`📈 Puan durumu: Temel=${base.score}, +SB=${safeBrowsingThreats*40}, +Domain=${domainThreats*20}, Final=${riskScore}`);
-  console.log(`📊 Tehditler: Safe Browsing=${safeBrowsingThreats}, Domain=${domainThreats}, Toplam=${totalThreats}`);
+  console.log(`📊 Tehditler: Safe Browsing=${safeBrowsingThreats}, Domain=${domainThreats}, Toplam=${safeBrowsingThreats + domainThreats}`);
   
-  // Risk seviyesini belirle
+  // 6. RİSK SEVİYESİNİ HESAPLA (TUTARLI BİR ŞEKİLDE)
   let riskLevel: 'safe' | 'low' | 'medium' | 'high' | 'fraud';
   
-  if (totalThreats > 0) {
-    if (riskScore >= 80) {
-      riskLevel = 'fraud';
-    } else if (riskScore >= 60) {
-      riskLevel = 'high';
-    } else if (riskScore >= 40) {
-      riskLevel = 'medium';
-    } else if (riskScore >= 20) {
-      riskLevel = 'low';
-    } else {
-      riskLevel = 'safe';
-    }
+  // TEK VE TUTARLI BİR MANTIK KULLAN:
+  // Risk seviyesini SADECE final riskScore'a göre belirle
+  if (riskScore >= 80) {
+    riskLevel = 'fraud';
+  } else if (riskScore >= 60) {
+    riskLevel = 'high';
+  } else if (riskScore >= 40) {
+    riskLevel = 'medium';
+  } else if (riskScore >= 20) {
+    riskLevel = 'low';
   } else {
-    // Tehdit yoksa temel analizin riskLevel'ını kullan
-    riskLevel = base.riskLevel;
+    riskLevel = 'safe';
   }
   
-  // Sebepleri birleştir
+  // DEBUG: Eski ve yeni risk seviyelerini karşılaştır
+  console.log(`🔍 DEBUG: base.riskLevel = ${base.riskLevel}`);
+  console.log(`🔍 DEBUG: riskScore = ${riskScore}`);
+  console.log(`🔍 DEBUG: Yeni riskLevel = ${riskLevel}`);
+  
+  // ÖZEL DURUM: Eğer hiç tehdit yoksa ve temel analizde fraud varsa
+  // (Bu nadir bir durum, ama temel analizin kritik sinyallerini de dikkate al)
+  if (safeBrowsingThreats === 0 && domainThreats === 0) {
+    if (base.riskLevel === 'fraud' && riskScore < 80) {
+      // Temel analiz fraud diyorsa puanı artır
+      riskScore = Math.max(riskScore, 80);
+      riskLevel = 'fraud';
+      console.log(`⚠️  Özel durum: Temel analiz fraud, tehdit yok ama fraud olarak işaretlendi`);
+    } else if (base.riskLevel === 'high' && riskScore < 60) {
+      // Temel analiz high diyorsa puanı artır
+      riskScore = Math.max(riskScore, 60);
+      riskLevel = 'high';
+      console.log(`⚠️  Özel durum: Temel analiz high, tehdit yok ama high olarak işaretlendi`);
+    }
+  }
+  
+  // 7. SEBEPLERİ BİRLEŞTİR VE FORMATLA
   const formattedThreats = threatDetails.map(detail => {
     if (detail.includes('Phishing')) return `🎣 ${detail}`;
     if (detail.includes('Malware')) return `🦠 ${detail}`;
+    if (detail.includes('Şüpheli domain')) return `⚠️ ${detail}`;
     return `⚠️ ${detail}`;
   });
   
+  // Sebepleri birleştir (en fazla 5)
   const allReasons = [
     ...formattedThreats,
     ...base.reasons
   ].slice(0, 5);
   
-  console.log(`🎯 Final: ${riskLevel} risk, ${riskScore} puan, ${totalThreats} tehdit`);
+  // Eğer hiç sebep yoksa, risk seviyesine göre genel bir açıklama ekle
+  if (allReasons.length === 0) {
+    if (riskLevel === 'safe') {
+      allReasons.push('✅ Güvenli mesaj - risk bulunamadı');
+    } else if (riskLevel === 'low') {
+      allReasons.push('⚠️ Düşük risk seviyesi');
+    }
+  }
+  
+  console.log(`🎯 Final Sonuç: ${riskLevel} risk, ${riskScore} puan, ${allReasons.length} sebep`);
   
   return {
     riskLevel,
@@ -165,9 +194,11 @@ export async function analyzeFlow(
       urlCount: urls.length,
       safeBrowsingThreats,
       domainThreats,
-      totalThreats,
+      totalThreats: safeBrowsingThreats + domainThreats,
       allUrls: urls,
-      threats: threatDetails
+      threats: threatDetails,
+      baseRiskLevel: base.riskLevel,
+      baseScore: base.score
     }
   };
 }
