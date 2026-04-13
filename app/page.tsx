@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { AnalysisResult } from '@/types';
 
+const AUTHOR_LINKEDIN = 'https://www.linkedin.com/in/volkantasbent/';
+
 export default function HomePage() {
   const [smsText, setSmsText] = useState('');
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -620,13 +622,37 @@ export default function HomePage() {
             SMS Control
           </p>
           <p style={{
-            margin: 0,
+            margin: '0 0 12px 0',
             fontSize: '14px',
             opacity: 0.8,
             fontFamily: "'Inter', sans-serif",
             fontWeight: '400'
           }}>
             © 2024 SMS Control. Tüm hakları saklıdır.
+          </p>
+          <p style={{ margin: 0, fontSize: '13px', fontFamily: "'Inter', sans-serif", fontWeight: '400' }}>
+            <a
+              href={AUTHOR_LINKEDIN}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                color: '#93c5fd',
+                textDecoration: 'none',
+                opacity: 0.95,
+                borderBottom: '1px solid rgba(147, 197, 253, 0.4)',
+                transition: 'color 0.2s, border-color 0.2s, opacity 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#bfdbfe';
+                e.currentTarget.style.borderBottomColor = 'rgba(191, 219, 254, 0.8)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#93c5fd';
+                e.currentTarget.style.borderBottomColor = 'rgba(147, 197, 253, 0.4)';
+              }}
+            >
+              Created by Volkan Taşbent
+            </a>
           </p>
         </div>
       </footer>
