@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { AnalysisResult } from '@/types';
 
-const AUTHOR_LINKEDIN = 'https://www.linkedin.com/in/volkantasbent/';
+const AUTHOR_LINKEDIN = 'https://www.linkedin.com/in/volkan-tasbent/';
 
 export default function HomePage() {
   const [smsText, setSmsText] = useState('');
